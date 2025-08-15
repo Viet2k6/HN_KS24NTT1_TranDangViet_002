@@ -9,15 +9,13 @@ class Member {
     getDetails() {
         return `ID: ${this.memberId}, Name: ${this.name}, Contact: ${this.contact}, Borrowed Items: ${this.borrowedItems.length}`;
     }
-    ;
 }
 Member.nextId = 1;
 class LibraryItem {
-    constructor(title, standardLoanPeriod) {
+    constructor(title) {
         this.id = LibraryItem.nextId++;
         this.title = title;
         this.isAvailable = true;
-        this.standardLoanPeriod = standardLoanPeriod;
     }
     borrowItem(member) {
         if (this.isAvailable) {
@@ -36,32 +34,42 @@ class LibraryItem {
         }
         return false;
     }
-    getLoanPeriod() {
-        return this.standardLoanPeriod;
-    }
 }
 LibraryItem.nextId = 1;
 class Book extends LibraryItem {
-    constructor(title, author, standardLoanPeriod, lateReturnFee) {
-        super(title, standardLoanPeriod);
+    constructor(title, author) {
+        super(title);
         this.author = author;
-        this.standardLoanPeriod = standardLoanPeriod;
-        this.lateReturnFee = lateReturnFee;
+    }
+    calculateLateFee(daysOverdue) {
+        return daysOverdue * 10000;
+    }
+    getLoanPeriod() {
+        return 30;
+    }
+    getItemType() {
+        return "Sách";
     }
 }
 class Magazine extends LibraryItem {
-    constructor(title, issueNumber, standardLoanPeriod, lateReturnFee) {
-        super(title, standardLoanPeriod);
+    constructor(title, issueNumber) {
+        super(title);
         this.issueNumber = issueNumber;
-        this.standardLoanPeriod = standardLoanPeriod;
-        this.lateReturnFee = lateReturnFee;
+    }
+    calculateLateFee(daysOverdue) {
+        return daysOverdue * 5000;
+    }
+    getLoanPeriod() {
+        return 7;
+    }
+    getItemType() {
+        return "Tạp chí";
     }
 }
 class Loan {
-    constructor(member, name, item, dueDate) {
+    constructor(member, item, dueDate) {
         this.loanId = Loan.nextId++;
         this.member = member;
-        this.name = name;
         this.item = item;
         this.dueDate = dueDate;
         this.isReturned = false;
@@ -72,153 +80,182 @@ class Loan {
 }
 Loan.nextId = 1;
 class Library {
-    constructor(loanId, member, item, dueDate) {
-        this.loanId = loanId;
-        this.member = member;
-        this.item = item;
-        this.dueDate = dueDate;
-        this.isReturned = false;
-    }
-    getDetails() {
-        return `Loan ID: ${this.loanId}, Member: ${this.member.getDetails()}, Item: ${this.item.title}, Due Date: ${this.dueDate.toDateString()}, Returned: ${this.isReturned}`;
-    }
     static addItem(item) {
-        Library.items.push(item);
+        this.items.push(item);
     }
     static addMember(name, contact) {
-        const newMember = new Member(name, contact);
-        Library.members.push(newMember);
-        return newMember;
+        const member = new Member(name, contact);
+        this.members.push(member);
+        return member;
     }
     static borrowItem(memberId, itemId) {
-        const member = Library.members.find(m => m.memberId === memberId);
-        const item = Library.items.find(i => i.id === itemId);
+        const member = this.members.find(m => m.memberId === memberId);
+        const item = this.items.find(i => i.id === itemId);
         if (member && item && item.isAvailable) {
             const dueDate = new Date();
             dueDate.setDate(dueDate.getDate() + item.getLoanPeriod());
-            const loan = new Loan(member, member.name, item, dueDate);
+            const loan = new Loan(member, item, dueDate);
             item.borrowItem(member);
-            Library.loans.push(loan);
+            this.loans.push(loan);
             return loan;
         }
         return null;
     }
     static returnItem(itemId) {
-        const item = Library.items.find(i => i.id === itemId);
-        const loan = Library.loans.find(l => l.item.id === itemId);
-        if (item && loan) {
-            item.returnItem(loan.member);
+        const loan = this.loans.find(l => l.item.id === itemId && !l.isReturned);
+        if (loan) {
+            loan.item.returnItem(loan.member);
             loan.isReturned = true;
             return true;
         }
         return false;
     }
-    static listBorrowedItemsByMember(memberId) {
-        return Library.loans
+    static listAvailableItems() {
+        return this.items.filter(item => item.isAvailable);
+    }
+    static listMemberLoans(memberId) {
+        return this.loans
             .filter(loan => loan.member.memberId === memberId && !loan.isReturned)
             .map(loan => loan.item);
     }
-    static listAvailableItems() {
-        return Library.items.filter(item => item.isAvailable);
-    }
 }
-Library.nextId = 1;
 Library.items = [];
 Library.members = [];
 Library.loans = [];
 const printMenu = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
     while (true) {
         const choiceInput = prompt(`
-    -----MENU-----
-    1. Thêm thành viên mới
-    2. Thêm tài liệu mới 
-    3. Mượn tài liệu
-    4. Trả tài liệu
-    5. Hiển thị danh sách tài liệu có sẵn
-    6. Hiển thị danh sách tài liệu đang mượn của một thành viên
-    7. Tính và hiển thị tổng phí phạt đã thu
-    8. Thống kê số lượng từng loại tài liệu
-    9. Cập nhật tiêu đề một tài liệu
-    10. Tìm kiếm thành viên hoặc tài liệu theo ID
-    11.Thoát chương trình
-    Nhập lựa chọn của bạn:`);
+-----MENU-----
+1. Thêm thành viên mới
+2. Thêm tài liệu mới 
+3. Mượn tài liệu
+4. Trả tài liệu
+5. Hiển thị danh sách tài liệu có sẵn
+6. Hiển thị danh sách tài liệu đang mượn của một thành viên
+7. Tính và hiển thị tổng phí phạt đã thu
+8. Thống kê số lượng từng loại tài liệu
+9. Cập nhật tiêu đề một tài liệu
+10. Tìm kiếm thành viên hoặc tài liệu theo ID
+11. Thoát chương trình
+Nhập lựa chọn của bạn:`);
         const choice = Number(choiceInput);
-        if (isNaN(choice) || choice < 0) {
-            alert('Vui lòng nhập số hợp lệ.');
+        if (isNaN(choice) || choice < 1 || choice > 11) {
+            alert(`Nhập số không hợp lệ`);
             continue;
         }
         switch (choice) {
-            case 1:
-                const memberName = (_a = prompt('Nhập tên thành viên:')) !== null && _a !== void 0 ? _a : '';
-                const memberContact = (_b = prompt('Nhập thông tin liên hệ của thành viên:')) !== null && _b !== void 0 ? _b : '';
+            case 1: {
+                const memberName = prompt(`Nhập tên thành viên:`);
+                const memberContact = prompt(`Nhập thông tin liên hệ của thành viên:`);
+                if (!memberName || !memberContact) {
+                    alert(`Thông tin không hợp lệ.`);
+                    break;
+                }
                 const newMember = Library.addMember(memberName, memberContact);
-                alert('Thêm thành viên thành công.');
+                alert(`Thêm thành viên thành công. Mã thành viên: ${newMember.memberId}`);
                 break;
-            case 2:
-                const itemType = (_d = (_c = prompt('Nhập loại tài liệu (sách/tạp chí):')) === null || _c === void 0 ? void 0 : _c.toLowerCase()) !== null && _d !== void 0 ? _d : '';
-                const itemTitle = (_e = prompt('Nhập tiêu đề tài liệu:')) !== null && _e !== void 0 ? _e : '';
+            }
+            case 2: {
+                const itemType = prompt(`Nhập loại tài liệu (sách/tạp chí):`);
+                const itemTitle = prompt(`Nhập tiêu đề tài liệu:`);
+                if (!itemType || !itemTitle) {
+                    alert(`Thông tin không hợp lệ.`);
+                    break;
+                }
                 let newItem = null;
-                if (itemType === 'sách') {
-                    const author = (_f = prompt('Nhập tên tác giả:')) !== null && _f !== void 0 ? _f : '';
-                    const standardLoanPeriod = Number((_g = prompt('Nhập thời gian mượn chuẩn (ngày):')) !== null && _g !== void 0 ? _g : '14');
-                    const lateReturnFee = Number((_h = prompt('Nhập phí trả muộn:')) !== null && _h !== void 0 ? _h : '5000');
-                    newItem = new Book(itemTitle, author, standardLoanPeriod, lateReturnFee);
+                if (itemType.toLowerCase() === 'sách') {
+                    const author = prompt(`Nhập tên tác giả:`);
+                    if (!author) {
+                        alert(`Tên tác giả không hợp lệ.`);
+                        break;
+                    }
+                    newItem = new Book(itemTitle, author);
                 }
-                else if (itemType === 'tạp chí') {
-                    const issueNumber = Number((_j = prompt('Nhập số phát hành:')) !== null && _j !== void 0 ? _j : '0');
-                    const standardLoanPeriod = Number((_k = prompt('Nhập thời gian mượn chuẩn (ngày):')) !== null && _k !== void 0 ? _k : '14');
-                    const lateReturnFee = Number((_l = prompt('Nhập phí trả muộn:')) !== null && _l !== void 0 ? _l : '5000');
-                    newItem = new Magazine(itemTitle, issueNumber, standardLoanPeriod, lateReturnFee);
-                }
-                if (newItem) {
-                    Library.addItem(newItem);
-                    alert('Thêm tài liệu thành công.');
+                else if (itemType.toLowerCase() === 'tạp chí') {
+                    const issueInput = prompt(`Nhập số phát hành:`);
+                    const issueNumber = Number(issueInput);
+                    if (isNaN(issueNumber)) {
+                        alert(`Số phát hành không hợp lệ.`);
+                        break;
+                    }
+                    newItem = new Magazine(itemTitle, issueNumber);
                 }
                 else {
-                    alert('Thêm tài liệu thất bại.');
+                    alert(`Loại tài liệu không hợp lệ.`);
+                    break;
                 }
+                Library.addItem(newItem);
+                alert(`Thêm tài liệu thành công. Mã tài liệu: ${newItem.id}`);
                 break;
-            case 3:
-                const borrowMemberId = Number((_m = prompt('Nhập ID thành viên:')) !== null && _m !== void 0 ? _m : '0');
-                const itemId = Number((_o = prompt('Nhập ID tài liệu:')) !== null && _o !== void 0 ? _o : '0');
-                const loan = Library.borrowItem(borrowMemberId, itemId);
+            }
+            case 3: {
+                const memberIdInput = prompt(`Nhập ID thành viên:`);
+                const itemIdInput = prompt(`Nhập ID tài liệu:`);
+                const memberId = Number(memberIdInput);
+                const itemId = Number(itemIdInput);
+                if (isNaN(memberId) || isNaN(itemId)) {
+                    alert(`ID không hợp lệ.`);
+                    break;
+                }
+                const loan = Library.borrowItem(memberId, itemId);
                 if (loan) {
-                    alert('Mượn tài liệu thành công.');
+                    alert(`Mượn tài liệu thành công. Ngày hết hạn: ${loan.dueDate.toDateString()}`);
                 }
                 else {
-                    alert('Mượn tài liệu thất bại.');
+                    alert(`Mượn tài liệu thất bại.`);
                 }
                 break;
-            case 4:
-                const returnItemId = Number((_p = prompt('Nhập ID tài liệu cần trả:')) !== null && _p !== void 0 ? _p : '0');
-                const isReturned = Library.returnItem(returnItemId);
-                if (isReturned) {
-                    alert('Trả tài liệu thành công.');
+            }
+            case 4: {
+                const itemIdInput = prompt(`Nhập ID tài liệu cần trả:`);
+                const itemId = Number(itemIdInput);
+                if (isNaN(itemId)) {
+                    alert(`ID không hợp lệ.`);
+                    break;
+                }
+                const success = Library.returnItem(itemId);
+                if (success) {
+                    alert(`Trả tài liệu thành công.`);
                 }
                 else {
-                    alert('Trả tài liệu thất bại.');
+                    alert(`Trả tài liệu thất bại.`);
                 }
                 break;
-            case 5:
+            }
+            case 5: {
                 const availableItems = Library.listAvailableItems();
                 if (availableItems.length > 0) {
-                    alert('Danh sách tài liệu có sẵn:\n' + availableItems.map(item => item.title).join('\n'));
+                    let list = '';
+                    for (const item of availableItems) {
+                        list += `ID: ${item.id} - ${item.title} (${item.getItemType()})\n`;
+                    }
+                    alert(`Danh sách tài liệu có sẵn:\n${list}`);
                 }
                 else {
-                    alert('Không có tài liệu nào có sẵn.');
+                    alert(`Không có tài liệu nào có sẵn.`);
                 }
                 break;
-            case 6:
-                const listMemberId = Number((_q = prompt('Nhập ID thành viên:')) !== null && _q !== void 0 ? _q : '0');
-                const borrowedItems = Library.listBorrowedItemsByMember(listMemberId);
+            }
+            case 6: {
+                const memberIdInput = prompt(`Nhập ID thành viên:`);
+                const memberId = Number(memberIdInput);
+                if (isNaN(memberId)) {
+                    alert(`ID không hợp lệ.`);
+                    break;
+                }
+                const borrowedItems = Library.listMemberLoans(memberId);
                 if (borrowedItems.length > 0) {
-                    alert('Danh sách tài liệu đang mượn của thành viên:\n' + borrowedItems.map(item => item.title).join('\n'));
+                    let list = '';
+                    for (const item of borrowedItems) {
+                        list += `ID: ${item.id} - ${item.title} (${item.getItemType()})\n`;
+                    }
+                    alert(`Danh sách tài liệu đang mượn:\n${list}`);
                 }
                 else {
-                    alert('Không có tài liệu nào đang mượn.');
+                    alert(`Thành viên không mượn tài liệu nào.`);
                 }
                 break;
+            }
             case 7:
                 break;
             case 8:
@@ -228,10 +265,10 @@ const printMenu = () => {
             case 10:
                 break;
             case 11:
-                alert('Thoát chương trình');
+                alert(`Thoát chương trình.`);
                 return;
             default:
-                alert('Lựa chọn không hợp lệ.');
+                alert(`Lựa chọn không hợp lệ.`);
         }
     }
 };
